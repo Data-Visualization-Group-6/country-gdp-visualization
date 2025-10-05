@@ -57,7 +57,7 @@ function numberConversion(number){
   if (number >= 1000000 && number <= 999999999){
     return (number/1000000).toFixed(2) + "M";
   }else if (number >= 1000000000 && number <= 999999999999){
-    return (number/1000000000).toFixed(2) + "B";
+    return (number/1000000000).toFixed(1) + "B";
   }else if (number >= 1000000000000 && number <= 999999999999999){
     return (number/1000000000000).toFixed(2) + "T";
   
@@ -100,12 +100,12 @@ function buildHierarchy(rows, year) {
       name: r["Country Name"],
       continent: r["Continent Name"] || "Unknown",
       unemployment: Number(r.Unemployment).toFixed(0),
-      inflation: Number(r["Inflation Rate"]).toFixed(0),
-      service: Number(r["Service (% GDP)"]).toFixed(0),
-      import: Number(r["Import (% GDP)"]).toFixed(0),
-      export: Number(r["Export (% GDP)"]).toFixed(0),
-      agriculture: Number(r["Agriculture (% GDP)"]).toFixed(0),
-      industry: Number(r["Industry (% GDP)"]).toFixed(0),
+      inflation: Number(r["Inflation Rate"]).toFixed(1),
+      service: Number(r["Service (% GDP)"]).toFixed(1),
+      import: Number(r["Import (% GDP)"]).toFixed(1),
+      export: Number(r["Export (% GDP)"]).toFixed(1),
+      agriculture: Number(r["Agriculture (% GDP)"]).toFixed(1),
+      industry: Number(r["Industry (% GDP)"]).toFixed(1),
       gpdpercapita: Number(r["GDP Per Capita"]).toFixed(2),
       education:Number(r["Education Expenditure"]).toFixed(0),
       health: Number(r["Health Expenditure"]).toFixed(0)
