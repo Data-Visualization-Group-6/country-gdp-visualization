@@ -161,7 +161,6 @@ const VoronoiTreemap = () => {
   const svgRef = useRef(null);
   const [dims, setDims] = useState({ w: 1000, h: 700 });
   const toolTipRef = useRef(null); // ref for toolTip object
-  const toolTipRef = useRef(null); // ref for toolTip object
 
   // Resize observer for responsive SVG
   useEffect(() => {
@@ -345,7 +344,7 @@ const VoronoiTreemap = () => {
     // COUNTRY GROUPS (depth === 1)
     const countries = root.children || [];
     const gCountries = svg.append("g").attr("class", "countries");
-    
+
     countries.forEach((node) => {
       const country = node.data;
       const polygon = node.polygon;
