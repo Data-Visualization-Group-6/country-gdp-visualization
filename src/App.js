@@ -50,8 +50,8 @@ function calcMakeup(record) {
     "Import (% GDP)": Number(record["Import (% GDP)"]) || 0,
   };
   const sum = Object.values(parts).reduce((s, v) => s + v, 0);
-  const total = Object.values(parts).reduce((s, v) => s + v, 0); // reminder to merge this return
-  const other = Math.max(0, 100 - total);                       // this too
+  // const total = Object.values(parts).reduce((s, v) => s + v, 0); // reminder to merge this return
+  // const other = Math.max(0, 100 - total);                       // this too
   //   return { ...comp, Other: other };                        //   ref
   if (sum <= 0) return {};
   return Object.fromEntries(Object.entries(parts).map(([k, v]) => [k, (v / sum) * 100]));
