@@ -108,6 +108,7 @@ function buildHierarchy(rows, year, selectedCountries, selectedContinents) {
 
   const children = picked.map((r) => {
     const country = {
+      // MINOR MERGE CONFLICT WITH 'toFixed' (check later)
       name: r["Country Name"],
       continent: r["Continent Name"] || "Unknown",
       unemployment: Number(r.Unemployment).toFixed(0),
@@ -160,6 +161,7 @@ const VoronoiTreemap = () => {
   const svgRef = useRef(null);
   const [dims, setDims] = useState({ w: 1000, h: 700 });
   const toolTipRef = useRef(null); // ref for toolTip object
+  const toolTipRef = useRef(null); // ref for toolTip object
 
   // Resize observer for responsive SVG
   useEffect(() => {
@@ -182,8 +184,25 @@ const VoronoiTreemap = () => {
       .style("font-size", "12px"); 
       
 
+
+    //tooltip creation when page is first rendered
+    toolTipRef.current = d3.select("body")
+      .append("div")
+      .attr("class","tooltip")
+      .style("position", "absolute")
+      .style("opacity",0)
+      .style("pointer-events","none")
+      .style("background","rgba(0,0,0,0.8)")
+      .style("color", "#fff")
+      .style("padding", "6px 10px")
+      .style("border-radius", "4px")
+      .style("font-size", "12px"); 
+      
+
     if (wrapperRef.current) ro.observe(wrapperRef.current);
     return () => ro.disconnect();
+
+
 
 
   }, []);
@@ -326,9 +345,7 @@ const VoronoiTreemap = () => {
     // COUNTRY GROUPS (depth === 1)
     const countries = root.children || [];
     const gCountries = svg.append("g").attr("class", "countries");
-
-
-    //
+    
     countries.forEach((node) => {
       const country = node.data;
       const polygon = node.polygon;
