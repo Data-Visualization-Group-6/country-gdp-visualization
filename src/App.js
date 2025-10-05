@@ -54,18 +54,10 @@ function calcMakeup(record) {
   return { ...comp, Other: other };
 }
 
-function buildHierarchy(rows, year, selectedCountries, selectedContinents) {
-  let yearRows = rows.filter(
+function buildHierarchy(rows, year) {
+  const yearRows = rows.filter(
     (r) => Number(r.Year) === Number(year) && r["Country Name"] && Number(r.GDP) > 0
   );
-
-  // Filter by selected countries and continents
-  if (selectedCountries.size > 0) {
-    yearRows = yearRows.filter(r => selectedCountries.has(r["Country Name"]));
-  }
-  if (selectedContinents.size > 0) {
-    yearRows = yearRows.filter(r => selectedContinents.has(r["Continent Name"]));
-  }
 
   // limit to TOP_N per continent + Others (adjust TOP_N_PER_CONTINENT to taste)
   const byCont = d3.group(yearRows, (d) => d["Continent Name"] || "Unknown");
@@ -130,13 +122,15 @@ const VoronoiTreemap = () => {
   const [yearBounds, setYearBounds] = useState([2000, 2022]);
   const [selectedYear, setSelectedYear] = useState(2000);
   const [displayMode, setDisplayMode] = useState("name"); // 'name' or 'makeup'
-  const [selectedCountries, setSelectedCountries] = useState(new Set());
-  const [selectedContinents, setSelectedContinents] = useState(new Set());
-  const [expandedContinents, setExpandedContinents] = useState(new Set());
 
   const wrapperRef = useRef(null);
   const svgRef = useRef(null);
   const [dims, setDims] = useState({ w: 1000, h: 700 });
+
+  console.log("continentColors entries:", Object.entries(continentColors));
+  console.log("gdpComponentColors entries:", Object.entries(gdpComponentColors));
+  console.log("displayMode:", displayMode);
+
 
   // Resize observer for responsive SVG
   useEffect(() => {
@@ -147,6 +141,44 @@ const VoronoiTreemap = () => {
     if (wrapperRef.current) ro.observe(wrapperRef.current);
     return () => ro.disconnect();
   }, []);
+
+  useEffect(() => {
+  async function loadCSV() {
+    setProcessing(true);
+    Papa.parse("countries2.csv", {
+      download: true,
+      header: true,
+      dynamicTyping: true,
+      skipEmptyLines: true,
+      complete: ({ data }) => {
+        const coerced = data.map((r) => ({
+          ...r,
+          Year: Number(r.Year),
+          GDP: Number(r.GDP),
+          Unemployment: r.Unemployment !== "" ? Number(r.Unemployment) : null,
+          "Inflation Rate": r["Inflation Rate"] !== "" ? Number(r["Inflation Rate"]) : null,
+        }));
+        setRows(coerced);
+
+        const years = coerced.map((r) => r.Year).filter((y) => !isNaN(y));
+        if (years.length) {
+          const min = Math.min(...years);
+          const max = Math.max(...years);
+          setYearBounds([min, max]);
+          setSelectedYear(min);
+        }
+        setProcessing(false);
+      },
+      error: (err) => {
+        console.error("CSV load error:", err);
+        setProcessing(false);
+      },
+    });
+  }
+
+  loadCSV();
+  }, []); // runs once on mount
+
 
   // Parse CSV via Papa
   const onFile = async (e) => {
@@ -173,10 +205,6 @@ const VoronoiTreemap = () => {
           setYearBounds([min, max]);
           setSelectedYear(min);
         }
-        // Reset selections when new data is loaded
-        setSelectedCountries(new Set());
-        setSelectedContinents(new Set());
-        setExpandedContinents(new Set());
         setProcessing(false);
       },
       error: (err) => {
@@ -187,63 +215,10 @@ const VoronoiTreemap = () => {
     });
   };
 
-  // Get hierarchical structure of continents and their countries
-  const continentCountryMap = useMemo(() => {
-    if (!rows.length) return {};
-    const map = {};
-    rows.forEach(row => {
-      const continent = row["Continent Name"];
-      const country = row["Country Name"];
-      if (continent && country) {
-        if (!map[continent]) {
-          map[continent] = new Set();
-        }
-        map[continent].add(country);
-      }
-    });
-    // Convert Sets to sorted arrays
-    const sortedMap = {};
-    Object.keys(map).sort().forEach(continent => {
-      sortedMap[continent] = [...map[continent]].sort();
-    });
-    return sortedMap;
-  }, [rows]);
-
-  const availableContinents = useMemo(() => {
-    return Object.keys(continentCountryMap).sort();
-  }, [continentCountryMap]);
-
-  // Get top 5 countries based on current selections
-  const top5Countries = useMemo(() => {
-    if (!rows.length) return [];
-    
-    let filteredRows = rows.filter(
-      (r) => Number(r.Year) === Number(selectedYear) && r["Country Name"] && Number(r.GDP) > 0
-    );
-
-    // Apply same filtering logic as buildHierarchy
-    if (selectedCountries.size > 0) {
-      filteredRows = filteredRows.filter(r => selectedCountries.has(r["Country Name"]));
-    }
-    if (selectedContinents.size > 0) {
-      filteredRows = filteredRows.filter(r => selectedContinents.has(r["Continent Name"]));
-    }
-
-    // Sort by GDP and take top 5
-    return filteredRows
-      .sort((a, b) => Number(b.GDP) - Number(a.GDP))
-      .slice(0, 5)
-      .map(row => ({
-        name: row["Country Name"],
-        continent: row["Continent Name"],
-        gdp: Number(row.GDP)
-      }));
-  }, [rows, selectedYear, selectedCountries, selectedContinents]);
-
   const hierarchyData = useMemo(() => {
     if (!rows.length) return null;
-    return buildHierarchy(rows, selectedYear, selectedCountries, selectedContinents);
-  }, [rows, selectedYear, selectedCountries, selectedContinents]);
+    return buildHierarchy(rows, selectedYear);
+  }, [rows, selectedYear]);
 
   // Render Voronoi treemap
   useEffect(() => {
@@ -361,6 +336,7 @@ const VoronoiTreemap = () => {
     });
   }, [hierarchyData, dims, displayMode, selectedYear]);
 
+  
   return (
     <div className="w-full min-h-screen bg-white">
       <div className="max-w-7xl mx-auto p-6">
@@ -368,7 +344,7 @@ const VoronoiTreemap = () => {
 
         {/* Controls */}
         <div className="bg-gray-100 rounded-lg p-4 mb-6">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             {/* File Upload */}
             <div>
               <label className="block text-sm font-medium mb-2">Upload CSV File</label>
@@ -414,209 +390,69 @@ const VoronoiTreemap = () => {
               </select>
             </div>
           </div>
-
-          {/* Hierarchical Country and Continent Selection */}
-          {rows.length > 0 && (
-            <div>
-              <div className="flex items-center justify-between mb-3">
-                <label className="block text-sm font-medium">
-                  Countries & Continents ({selectedCountries.size} countries, {selectedContinents.size} continents selected)
-                </label>
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => {
-                      const allCountries = Object.values(continentCountryMap).flat();
-                      setSelectedCountries(new Set(allCountries));
-                      setSelectedContinents(new Set(availableContinents));
-                    }}
-                    className="text-xs bg-blue-500 text-white px-3 py-1 rounded hover:bg-blue-600"
-                  >
-                    Select All
-                  </button>
-                  <button
-                    onClick={() => {
-                      setSelectedCountries(new Set());
-                      setSelectedContinents(new Set());
-                    }}
-                    className="text-xs bg-gray-500 text-white px-3 py-1 rounded hover:bg-gray-600"
-                  >
-                    Clear All
-                  </button>
-                </div>
-              </div>
-              
-              <div className="max-h-60 overflow-y-auto border rounded bg-white">
-                {availableContinents.map(continent => {
-                  const countries = continentCountryMap[continent] || [];
-                  const isExpanded = expandedContinents.has(continent);
-                  const selectedCountriesInContinent = countries.filter(country => selectedCountries.has(country));
-                  const allCountriesInContinentSelected = countries.length > 0 && selectedCountriesInContinent.length === countries.length;
-                  const continentSelected = selectedContinents.has(continent) || allCountriesInContinentSelected;
-                  
-                  return (
-                    <div key={continent} className="border-b border-gray-100 last:border-b-0">
-                      {/* Continent Header */}
-                      <div className="flex items-center p-3 bg-gray-50 hover:bg-gray-100">
-                        <button
-                          onClick={() => {
-                            const newExpanded = new Set(expandedContinents);
-                            if (isExpanded) {
-                              newExpanded.delete(continent);
-                            } else {
-                              newExpanded.add(continent);
-                            }
-                            setExpandedContinents(newExpanded);
-                          }}
-                          className="mr-2 text-gray-600 hover:text-gray-800"
-                        >
-                          {isExpanded ? '▼' : '▶'}
-                        </button>
-                        <input
-                          type="checkbox"
-                          checked={continentSelected}
-                          onChange={(e) => {
-                            const newSelectedContinents = new Set(selectedContinents);
-                            const newSelectedCountries = new Set(selectedCountries);
-                            
-                            if (e.target.checked) {
-                              newSelectedContinents.add(continent);
-                              // Select all countries in this continent
-                              countries.forEach(country => newSelectedCountries.add(country));
-                            } else {
-                              newSelectedContinents.delete(continent);
-                              // Deselect all countries in this continent
-                              countries.forEach(country => newSelectedCountries.delete(country));
-                            }
-                            
-                            setSelectedContinents(newSelectedContinents);
-                            setSelectedCountries(newSelectedCountries);
-                          }}
-                          className="mr-3"
-                        />
-                        <span className="font-medium text-sm flex-1">{continent}</span>
-                        <span className="text-xs text-gray-500">
-                          {selectedCountriesInContinent.length}/{countries.length} countries
-                        </span>
-                      </div>
-                      
-                      {/* Countries List */}
-                      {isExpanded && (
-                        <div className="bg-white">
-                          {countries.map(country => (
-                            <label key={country} className="flex items-center p-2 pl-8 hover:bg-gray-50 cursor-pointer border-l-2 border-gray-100">
-                              <input
-                                type="checkbox"
-                                checked={selectedCountries.has(country)}
-                                onChange={(e) => {
-                                  const newSelectedCountries = new Set(selectedCountries);
-                                  const newSelectedContinents = new Set(selectedContinents);
-                                  
-                                  if (e.target.checked) {
-                                    newSelectedCountries.add(country);
-                                    // Check if all countries in this continent are now selected
-                                    const updatedSelectedInContinent = [...selectedCountriesInContinent, country];
-                                    if (updatedSelectedInContinent.length === countries.length) {
-                                      newSelectedContinents.add(continent);
-                                    }
-                                  } else {
-                                    newSelectedCountries.delete(country);
-                                    // If deselecting a country, also deselect the continent
-                                    newSelectedContinents.delete(continent);
-                                  }
-                                  
-                                  setSelectedCountries(newSelectedCountries);
-                                  setSelectedContinents(newSelectedContinents);
-                                }}
-                                className="mr-3"
-                              />
-                              <span className="text-sm">{country}</span>
-                            </label>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          )}
         </div>
 
-        {/* Top 5 Countries Section */}
-        {rows.length > 0 && top5Countries.length > 0 && (
-          <div className="bg-gray-100 rounded-lg p-4 mb-6">
-            <h3 className="font-bold mb-3">Top 5 Countries by GDP ({selectedYear})</h3>
-            <div className="bg-white rounded-lg overflow-hidden border border-gray-200">
-              <table className="w-full">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Rank</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Country</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Continent</th>
-                    <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">GDP</th>
-                  </tr>
-                </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
-                  {top5Countries.map((country, index) => (
-                    <tr key={country.name} className="hover:bg-gray-50">
-                      <td className="px-4 py-3 whitespace-nowrap">
-                        <span className="bg-blue-500 text-white text-xs font-bold rounded-full w-6 h-6 flex items-center justify-center">
-                          {index + 1}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 whitespace-nowrap">
-                        <div className="text-sm font-medium text-gray-900">{country.name}</div>
-                      </td>
-                      <td className="px-4 py-3 whitespace-nowrap">
-                        <div className="text-sm text-gray-500">{country.continent}</div>
-                      </td>
-                      <td className="px-4 py-3 whitespace-nowrap text-right">
-                        <div className="text-sm font-bold text-gray-900">
-                          {(() => {
-                            const trillions = country.gdp / 1e12;
-                            return `$${trillions >= 0.1 ? trillions.toFixed(2) + "T" : (country.gdp / 1e9).toFixed(0) + "B"}`;
-                          })()}
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-            
-            {top5Countries.length < 5 && (
-              <div className="text-center text-sm text-gray-500 mt-3">
-                Showing {top5Countries.length} countries (filtered by your selections)
-              </div>
-            )}
-          </div>
-        )}
+        
+        
 
-        {/* Legend */}
-        <div className="bg-gray-100 rounded-lg p-4 mb-6">
-          <h3 className="font-bold mb-3">Legend</h3>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-            <div><strong>Size:</strong> GDP (area)</div>
-            <div><strong>Opacity:</strong> Employment rate</div>
-            <div><strong>Border:</strong> Inflation (Green=+, Red=-, White=NULL)</div>
-            <div><strong>Color:</strong> {displayMode === "name" ? "Continent" : "GDP Components"}</div>
-          </div>
-          <div className="flex flex-wrap gap-3 mt-3 text-sm">
+        {/* LEGEND */}
+        <div className="bg-gray-100 rounded-lg p-4 mb-6 w-full">
+          <h3 className="font-bold mb-3 text-gray-800">Legend</h3>
+
+          <div className="flex flex-wrap gap-4">
             {displayMode === "name"
-              ? Object.entries(continentColors).map(([k, v]) => (
-                  <div key={k} className="flex items-center gap-2">
-                    <span className="inline-block w-4 h-4 rounded" style={{ background: v }} />
-                    {k}
+              ? Object.entries(continentColors).map(([label, color]) => (
+                  <div
+                    key={label}
+                    className="flex items-center gap-2 bg-white px-2 py-1 rounded border border-gray-200"
+                  >
+                    {/* Colored box */}
+                    <span
+                      className="w-5 h-5 inline-block rounded border border-gray-400 flex-shrink-0"
+                      style={{ backgroundColor: color }}
+                    ></span>
+                    <span
+                      style={{
+                        width: "24px",
+                        height: "24px",
+                        backgroundColor: color,
+                        border: "1px solid #666",
+                        flexShrink: 0,
+                        display: "inline-block",
+                      }}
+                    ></span>
+                    {/* Label text */}
+                    <span className="font-medium text-gray-800">{label}</span>
                   </div>
                 ))
-              : Object.entries(gdpComponentColors).map(([k, v]) => (
-                  <div key={k} className="flex items-center gap-2">
-                    <span className="inline-block w-4 h-4 rounded" style={{ background: v }} />
-                    {k}
+              : Object.entries(gdpComponentColors).map(([label, color]) => (
+                  <div
+                    key={label}
+                    className="flex items-center gap-2 bg-white px-2 py-1 rounded border border-gray-200"
+                  >
+                    {/* Colored box */}
+                    <span
+                      className="w-5 h-5 inline-block rounded border border-gray-400 flex-shrink-0"
+                      style={{ backgroundColor: color }}
+                    ></span>
+                    <span
+                      style={{
+                        width: "24px",
+                        height: "24px",
+                        backgroundColor: color,
+                        border: "1px solid #666",
+                        flexShrink: 0,
+                        display: "inline-block",
+                      }}
+                    ></span>
+                    {/* Label text */}
+                    <span className="font-medium text-gray-800">{label}</span>
                   </div>
                 ))}
           </div>
         </div>
+
+
 
         {/* Chart */}
         <div ref={wrapperRef} className="w-full bg-white rounded-lg shadow-sm ring-1 ring-gray-200">
