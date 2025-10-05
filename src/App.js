@@ -162,6 +162,10 @@ const VoronoiTreemap = () => {
   const [dims, setDims] = useState({ w: 1000, h: 700 });
   const toolTipRef = useRef(null); // ref for toolTip object
 
+  console.log("continentColors entries:", Object.entries(continentColors));
+  console.log("gdpComponentColors entries:", Object.entries(gdpComponentColors));
+  console.log("displayMode:", displayMode);
+
   // Resize observer for responsive SVG
   useEffect(() => {
     const ro = new ResizeObserver((entries) => {
@@ -180,31 +184,47 @@ const VoronoiTreemap = () => {
       .style("color", "#fff")
       .style("padding", "6px 10px")
       .style("border-radius", "4px")
-      .style("font-size", "12px"); 
-      
-
-
-    //tooltip creation when page is first rendered
-    toolTipRef.current = d3.select("body")
-      .append("div")
-      .attr("class","tooltip")
-      .style("position", "absolute")
-      .style("opacity",0)
-      .style("pointer-events","none")
-      .style("background","rgba(0,0,0,0.8)")
-      .style("color", "#fff")
-      .style("padding", "6px 10px")
-      .style("border-radius", "4px")
-      .style("font-size", "12px"); 
-      
+      .style("font-size", "12px");       
 
     if (wrapperRef.current) ro.observe(wrapperRef.current);
     return () => ro.disconnect();
-
-
-
-
   }, []);
+
+  useEffect(() => {
+  async function loadCSV() {
+    setProcessing(true);
+    Papa.parse("countries.csv", {
+      download: true,
+      header: true,
+      dynamicTyping: true,
+      skipEmptyLines: true,
+      complete: ({ data }) => {
+        const coerced = data.map((r) => ({
+          ...r,
+          Year: Number(r.Year),
+          GDP: Number(r.GDP),
+          Unemployment: r.Unemployment !== "" ? Number(r.Unemployment) : null,
+          "Inflation Rate": r["Inflation Rate"] !== "" ? Number(r["Inflation Rate"]) : null,
+        }));
+        setRows(coerced);
+
+        const years = coerced.map((r) => r.Year).filter((y) => !isNaN(y));
+        if (years.length) {
+          const min = Math.min(...years);
+          const max = Math.max(...years);
+          setYearBounds([min, max]);
+          setSelectedYear(min);
+        }
+        setProcessing(false);
+      },
+      error: (err) => {
+        console.error("CSV load error:", err);
+        setProcessing(false);
+      },
+    });
+  }
+  loadCSV();
+  }, []); // runs once on mount
 
   // Parse CSV via Papa
   const onFile = async (e) => {
