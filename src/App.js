@@ -162,6 +162,8 @@ const VoronoiTreemap = () => {
   const [selectedCountries, setSelectedCountries] = useState(new Set());
   const [selectedContinents, setSelectedContinents] = useState(new Set());
   const [expandedContinents, setExpandedContinents] = useState(new Set());
+  const [useOpacity, setUseOpacity] = useState(true);
+
 
   const wrapperRef = useRef(null);
   const svgRef = useRef(null);
@@ -348,7 +350,7 @@ const VoronoiTreemap = () => {
         g.append("path")
           .attr("d", `M${polygon.join("L")}Z`)
           .attr("fill", continentColors[country.continent] || "#ccc")
-          .attr("fill-opacity", getOpacity(country.unemployment))
+          .attr("fill-opacity", useOpacity ? getOpacity(country.unemployment) : 1)
           .attr("stroke", borderColor)
           .attr("stroke-width", 2)
 
@@ -382,7 +384,7 @@ const VoronoiTreemap = () => {
           g.append("path")
             .attr("d", `M${compPoly.join("L")}Z`)
             .attr("fill", gdpComponentColors[compNode.data.name] || "#ddd")
-            .attr("opacity", getOpacity(country.unemployment))
+            .attr("opacity", useOpacity ? getOpacity(country.unemployment) : 1)
             .attr("stroke", "rgba(0,0,0,0.05)")
             .attr("stroke-width", 1);
             
@@ -426,7 +428,7 @@ const VoronoiTreemap = () => {
         }
       }
     });
-  }, [hierarchyData, dims, displayMode, selectedYear]);
+  }, [hierarchyData, dims, displayMode, selectedYear, useOpacity]);
 
   return (
 
@@ -468,7 +470,23 @@ const VoronoiTreemap = () => {
                 <option value="makeup">GDP Makeup (subdivided)</option>
               </select>
             </div>
+
+            <div className="flex items-center gap-2">
+              <input
+                id="opacityToggle"
+                type="checkbox"
+                checked={useOpacity}
+                onChange={(e) => setUseOpacity(e.target.checked)}
+                className="h-4 w-4"
+                disabled={!rows.length}
+              />
+              <label htmlFor="opacityToggle" className="text-sm">
+                Use employment opacity
+              </label>
+            </div>
           </div>
+
+
 
           {/* Hierarchical Country and Continent Selection */}
           {rows.length > 0 && (
@@ -653,7 +671,7 @@ const VoronoiTreemap = () => {
           <h3 className="font-bold mb-3">Legend</h3>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
             <div><strong>Size:</strong> GDP (area)</div>
-            <div><strong>Opacity:</strong> Employment rate</div>
+            <div><strong>Opacity:</strong> {useOpacity ? "Employment rate" : "Solid Color"}</div>
             <div><strong>Border:</strong> Inflation (Green=+, Red=-, White=NULL)</div>
             <div><strong>Color:</strong> {displayMode === "name" ? "Continent" : "GDP Components"}</div>
           </div>
