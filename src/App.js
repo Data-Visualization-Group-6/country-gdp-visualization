@@ -135,13 +135,41 @@ function buildHierarchy(rows, year, selectedCountries, selectedContinents) {
             value: (Number(r.GDP) || 0) * (pct / 100),
           })),
         };
+
       } else {
         return {
           ...base,
           value: Number(r.GDP) || 0,
         };
       }
+
     });
+
+      const rest = items
+      .slice()
+      .sort((a, b) => Number(b.GDP) - Number(a.GDP))
+      .slice(TOP_9);
+
+    const othersGDP = d3.sum(rest, (r) => Number(r.GDP) || 0);
+
+    if (othersGDP > 0) {
+      countries.push({
+        name: `Others (${cont})`,
+        continent: cont || "Unknown",
+        value: othersGDP,
+        unemployment: null,
+        inflation: null,
+        gpdpercapita: null,
+        education: null,
+        health: null,
+        agriculture: null,
+        industry: null,
+        service: null,
+        import: null,
+        export: null,
+      });
+    }
+
 
     // continent node (no direct value; its size derives from its children)
     continentNodes.push({
