@@ -315,10 +315,10 @@ const VoronoiTreemap = () => {
         [w, h],
         [w, 0],
       ])
-      .convergenceRatio(0.015)
-      .maxIterationCount(80)
-      .minWeightRatio(0.002)
-      .prng(seededRandom(12345));
+      .convergenceRatio(0.015) // smaller = accruate
+      .maxIterationCount(80) // iterate for fitting
+      .minWeightRatio(0.002) // ensure small nodes don't disappear
+      .prng(seededRandom(12345)); // fixed seed for sizing
 
     vt(root);
 
@@ -361,6 +361,7 @@ const VoronoiTreemap = () => {
               .attr("fill-opacity", useOpacity ? getOpacity(country.unemployment) : 1)
               .attr("stroke", borderColor)
               .attr("stroke-width", 2)
+              // hovering over display
               .on("mouseover", (event)=>{ 
                 toolTipRef.current.html(
                   `<strong>${node.data.name} - ${node.data.continent ?? "Unknown"}</strong><br/>
@@ -381,7 +382,7 @@ const VoronoiTreemap = () => {
               .on("mouseleave", ()=>{ toolTipRef.current.style("opacity", 0); });
 
           } else {
-            // GDP components (sub-cells)
+            // gdp makeup components sectioning
             (node.children || []).forEach((compNode) => {
               const compPoly = compNode.polygon;
               if (!compPoly) return;
