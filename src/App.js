@@ -40,12 +40,12 @@ function getInflationColor(inflationRate) {
 }
 
 function getOpacity(unemployment) {
-  if (unemployment === null || unemployment === undefined || isNaN(unemployment)) return 0.1;
+  if (unemployment === null || unemployment === undefined || isNaN(unemployment)) return 1;
   
   const BASE = 4;
   const MAX = 15;
-  const BASE_OPACITY = 0.9;
-  const MAX_OPACITY = 0.1;
+  const BASE_OPACITY = 1;
+  const MAX_OPACITY = 0.3;
 
   const unemployment_ = Number(unemployment);
   const opacity = Math.max(BASE, Math.min (MAX, unemployment_));
@@ -353,7 +353,7 @@ const VoronoiTreemap = () => {
           .attr("stroke-width", 2)
 
           //checks if user hovers over a node in tree map if so display tool tip that was referebced in the toolTipRef along with various data
-          .on("mouseover", (event)=>{ toolTipRef.current.html(`<strong>${node.data.name}</strong><br/>
+          .on("mouseover", (event)=>{ toolTipRef.current.html(`<strong>${node.data.name} - ${node.data.continent ?? "Unknown"}</strong><br/>
                                                     GDP: $${numberConversion(node.value)}<br/>
                                                     GDP Per Capita: $${node.data.gpdpercapita ?? "N/A"}<br/>
                                                     Agriculture(% GDP): ${node.data.agriculture ?? "N/A"}%<br/>
