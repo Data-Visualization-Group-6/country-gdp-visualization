@@ -1,3 +1,11 @@
+/* 
+
+Voronoi treemap algorithm inspiration and explanation on parent/child node structures
+https://github.com/Kcnarf/d3-voronoi-treemap?tab=readme-ov-file
+https://github.com/d3/d3-hierarchy?tab=readme-ov-file
+
+*/
+
 import React, { useState, useEffect, useMemo, useRef } from "react";
 import * as d3 from "d3";
 import { voronoiTreemap } from "d3-voronoi-treemap";
@@ -64,15 +72,10 @@ function calcMakeup(record) {
   if (sum <= 0) return {};
   return Object.fromEntries(Object.entries(parts).map(([k, v]) => [k, (v / sum) * 100]));
 }
-function numberConversion(number){
-  if (number >= 1000000 && number <= 999999999){
-    return (number/1000000).toFixed(2) + "M";
-  }else if (number >= 1000000000 && number <= 999999999999){
-    return (number/1000000000).toFixed(2) + "B";
-  }else if (number >= 1000000000000 && number <= 999999999999999){
-    return (number/1000000000000).toFixed(2) + "T";
-  
-} 
+
+function numberConversion(value) {
+  if (value == null || isNaN(value)) return "N/A";
+  return (value / 1e12).toFixed(2) + "T";
 }
 
 function buildHierarchy(rows, year, selectedCountries, selectedContinents) {
@@ -155,8 +158,7 @@ function buildHierarchy(rows, year, selectedCountries, selectedContinents) {
 
 const VoronoiTreemap = () => {
   const [rows, setRows] = useState([]);
-  const [processing, setProcessing] = useState(false);
-  const [yearBounds, setYearBounds] = useState([2000, 2022]);
+  const [yearBounds, setYearBounds] = useState([2000, 2022]); // 2000 to 2022 years
   const [selectedYear, setSelectedYear] = useState(2000);
   const [displayMode, setDisplayMode] = useState("name"); // 'name' or 'makeup'
   const [selectedCountries, setSelectedCountries] = useState(new Set());
@@ -196,7 +198,6 @@ const VoronoiTreemap = () => {
 
   useEffect(() => {
   function loadCSV() {
-    setProcessing(true);
     Papa.parse(CSV_PATH, {
       download: true,
       header: true,
@@ -219,11 +220,9 @@ const VoronoiTreemap = () => {
           setYearBounds([min, max]);
           setSelectedYear(min);
         }
-        setProcessing(false);
       },
       error: (err) => {
         console.error("CSV load error:", err);
-        setProcessing(false);
       },
     });
   }
@@ -297,7 +296,6 @@ const VoronoiTreemap = () => {
     const { w, h } = dims;
     const svg = svgEl.attr("viewBox", `0 0 ${w} ${h}`);
 
-
     function seededRandom(seed) {
       let s = seed;
       return function() {
@@ -307,12 +305,14 @@ const VoronoiTreemap = () => {
     }
 
     
-    // Build hierarchy and compute polygons
+    // hierachy construction and shapes
     const root = d3
       .hierarchy(hierarchyData)
       .sum((d) => d.value || 0)
       .sort((a, b) => (b.value || 0) - (a.value || 0));
 
+    // https://github.com/Kcnarf/d3-voronoi-treemap/blob/master/src/d3-voronoi-treemap.js
+    // used to clip polygons to fit in SVG area
     const vt = voronoiTreemap()
       .clip([
         [0, 0],
@@ -327,7 +327,7 @@ const VoronoiTreemap = () => {
 
     vt(root);
 
-    // COUNTRY GROUPS (depth === 1)
+    // group into countries
     const countries = root.children || [];
     const gCountries = svg.append("g").attr("class", "countries");
 
@@ -345,7 +345,7 @@ const VoronoiTreemap = () => {
       
      
 
-      // Fill:
+      // draw the countries
       if (displayMode === "name" || !(node.children && node.children.length)) {
         g.append("path")
           .attr("d", `M${polygon.join("L")}Z`)
@@ -356,17 +356,17 @@ const VoronoiTreemap = () => {
 
           //checks if user hovers over a node in tree map if so display tool tip that was referebced in the toolTipRef along with various data
           .on("mouseover", (event)=>{ toolTipRef.current.html(`<strong>${node.data.name} - ${node.data.continent ?? "Unknown"}</strong><br/>
-                                                    GDP: $${numberConversion(node.value)}<br/>
-                                                    GDP Per Capita: $${node.data.gpdpercapita ?? "N/A"}<br/>
-                                                    Agriculture(% GDP): ${node.data.agriculture ?? "N/A"}%<br/>
-                                                    Service(% GDP): ${node.data.service?? "N/A"}%<br/>
-                                                    Industry(% GDP): ${node.data.industry?? "N/A"}%<br/>
-                                                    Inflation Rate: ${node.data.inflation ?? "N/A"}%<br/>
-                                                    Unemployment Rate: ${node.data.unemployment ?? "N/A"}%<br/>`)
+              GDP: $${numberConversion(node.value)}<br/>
+              GDP Per Capita: $${node.data.gpdpercapita ?? "N/A"}<br/>
+              Agriculture(% GDP): ${node.data.agriculture ?? "N/A"}%<br/>
+              Service(% GDP): ${node.data.service?? "N/A"}%<br/>
+              Industry(% GDP): ${node.data.industry?? "N/A"}%<br/>
+              Inflation Rate: ${node.data.inflation ?? "N/A"}%<br/>
+              Unemployment Rate: ${node.data.unemployment ?? "N/A"}%<br/>`)
            
           .style("opacity",1);   //make the tooltip visible                                       
           })
-          .on("mousemove", (event)=>{ toolTipRef.current                               // moves tooltip with mouse so mouse doesnt obstruct it
+          .on("mousemove", (event)=>{ toolTipRef.current           // moves tooltip with mouse so mouse doesnt obstruct it
                                       .style("left",event.pageX + 10 +"px")
                                       .style("top", event.pageY + 10 + "px");                                       
           })
@@ -376,7 +376,6 @@ const VoronoiTreemap = () => {
           });
 
       } else {
-        // Sub-cells: depth === 2 (components)
         // Draw components first, then a thin outline for the country
         (node.children || []).forEach((compNode) => {
           const compPoly = compNode.polygon;
@@ -433,7 +432,7 @@ const VoronoiTreemap = () => {
           .attr("stroke-width", 2);
       }
 
-      // Labels (country name + GDP) — size-aware to avoid clutter
+      // country labels
       if (area > 1200) {
         g.append("text")
           .attr("x", centroid[0])
@@ -456,8 +455,7 @@ const VoronoiTreemap = () => {
             .text(
               (() => {
                 const nodeValue = node.value || 0;
-                const trillions = nodeValue / 1e12;
-                return `$${trillions >= 0.1 ? trillions.toFixed(2) + "T" : (nodeValue / 1e9).toFixed(0) + "B"}`
+                return `$${((nodeValue || 0) / 1e12).toFixed(2)}T`;
               })()
             );
         }
@@ -470,13 +468,13 @@ const VoronoiTreemap = () => {
     <div className="w-full min-h-screen bg-white">
       <div className ="body">
       <div className="max-w-7xl mx-auto p-6">
-        <h1 className="text-3xl font-bold mb-6 text-center">GDP Voronoi Treemap Visualization</h1>
+        <h1 className="text-3xl font-bold mb-6 text-center">GDP Visualization</h1>
 
         {/* Controls */}
         <div className="bg-gray-100 rounded-lg p-4 mb-6">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
 
-            {/* Year Slider */}
+            {/* Time slider for different years */}
             <div>
               <label className="block text-sm font-medium mb-2">
                 Year: {selectedYear}
@@ -492,7 +490,7 @@ const VoronoiTreemap = () => {
               />
             </div>
 
-            {/* Display Mode */}
+            {/* Display either gdp makeup or by country name and size = gdp */}
             <div>
               <label className="block text-sm font-medium mb-2">Display Mode</label>
               <select
@@ -523,7 +521,7 @@ const VoronoiTreemap = () => {
 
 
 
-          {/* Hierarchical Country and Continent Selection */}
+          {/* Select country and continents */}
           {rows.length > 0 && (
             <div>
               <div className="flex items-center justify-between mb-3">
@@ -607,7 +605,7 @@ const VoronoiTreemap = () => {
                         </span>
                       </div>
                       
-                      {/* Countries List */}
+                      {/* Country list */}
                       {isExpanded && (
                         <div className="bg-white">
                           {countries.map(country => (
@@ -654,10 +652,6 @@ const VoronoiTreemap = () => {
         <div ref={wrapperRef} className="w-full bg-white">
           <svg ref={svgRef} className="w-full h-auto block" />
         </div>
-
-        {processing && (
-          <div className="text-center py-6 text-gray-600">Processing data…</div>
-        )}
 
         {/* Legend */}
         <div className="bg-gray-100 rounded-lg p-4 mb-6">
