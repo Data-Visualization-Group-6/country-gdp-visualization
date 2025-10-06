@@ -422,19 +422,51 @@ const VoronoiTreemap = () => {
           .on("mouseleave", ()=>{
             toolTipRef.current.style("opacity", 0);
           });
-
-      } else {
-        // Sub-cells: depth === 2 (components)
-        // Draw components first, then a thin outline for the country
-        (node.children || []).forEach((compNode) => {
+      } 
+      // If in makeup mode and there's enough area, add subdivision labels
+      if (displayMode === "makeup" && node.children) {
+        // First draw all component polygons
+        node.children.forEach(compNode => {
           const compPoly = compNode.polygon;
           if (!compPoly) return;
+          
+          // Draw subdivision path with hover interactions
           g.append("path")
-            .attr("d", `M${compPoly.join("L")}Z`)
-            .attr("fill", gdpComponentColors[compNode.data.name] || "#ddd")
+        .attr("d", `M${compPoly.join("L")}Z`)
+        .attr("fill", gdpComponentColors[compNode.data.name] || "#ddd")
+        .attr("opacity", opacity)
+        .attr("stroke", "rgba(0,0,0,0.2)")
+        .attr("stroke-width", 1)
+        .on("mouseover", (event, d) => {
+          const percentage = ((compNode.value / node.value) * 100).toFixed(1);
+          const label = compNode.data.name.replace(" (% GDP)", "");
+          
+          // Highlight the hovered region
+          d3.select(event.currentTarget)
+            .attr("opacity", 1)
+            .attr("stroke", "white")
+            .attr("stroke-width", 3);
+          
+          toolTipRef.current
+            .html(`${label}<br/>${percentage}%`)
+            .style("opacity", 1)
+            .style("left", `${event.pageX + 15}px`)
+            .style("top", `${event.pageY - 15}px`);
+        })
+        .on("mousemove", (event) => {
+          toolTipRef.current
+            .style("left", `${event.pageX + 15}px`)
+            .style("top", `${event.pageY - 15}px`);
+        })
+        .on("mouseleave", (event) => {
+          // Reset the styling when mouse leaves
+          d3.select(event.currentTarget)
             .attr("opacity", opacity)
-            .attr("stroke", "rgba(0,0,0,0.05)")
+            .attr("stroke", "rgba(0,0,0,0.2)")
             .attr("stroke-width", 1);
+          
+          toolTipRef.current.style("opacity", 0);
+        });
         });
 
         // Country outline on top
