@@ -11,11 +11,11 @@ const CSV_PATH =
   `${process.env.PUBLIC_URL}/countries.csv`;
 
 const continentColors = {
-  Africa: "#041035",
+  Africa: "#7f5539",
   Asia: "#0015ff",
   Europe: "#ff7d00",
   "North America": "#073b4c",
-  "South America": "#687259",
+  "South America": "#8ac926",
   Oceania: "#ff006d",
 };
 
