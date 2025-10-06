@@ -49,12 +49,25 @@ function calcMakeup(record) {
     "Export (% GDP)": Number(record["Export (% GDP)"]) || 0,
     "Import (% GDP)": Number(record["Import (% GDP)"]) || 0,
   };
-  const sum = Object.values(parts).reduce((s, v) => s + v, 0);
-  // const total = Object.values(parts).reduce((s, v) => s + v, 0); // reminder to merge this return
-  // const other = Math.max(0, 100 - total);                       // this too
-  //   return { ...comp, Other: other };                        //   ref
-  if (sum <= 0) return {};
-  return Object.fromEntries(Object.entries(parts).map(([k, v]) => [k, (v / sum) * 100]));
+  const total = Object.values(parts).reduce((s, v) => s + v, 0);
+  
+  if (total <= 0) return {};
+
+  // Add "Other" component to reach 100% if components sum to less than 100
+  const other = Math.max(0, 100 - total);
+  const sum = total + other;
+
+  // Convert all values to percentages relative to sum
+  const result = Object.fromEntries(
+    Object.entries(parts).map(([k, v]) => [k, (v / sum) * 100])
+  );
+
+  // Add Other component if it exists
+  if (other > 0) {
+    result["Other"] = (other / sum) * 100;
+  }
+
+  return result;
 }
 function numberConversion(number){
   if (number >= 1000000 && number <= 999999999){
@@ -422,7 +435,6 @@ const VoronoiTreemap = () => {
             .attr("opacity", opacity)
             .attr("stroke", "rgba(0,0,0,0.05)")
             .attr("stroke-width", 1);
-            
         });
 
         // Country outline on top
