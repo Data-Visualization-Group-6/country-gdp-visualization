@@ -2,7 +2,6 @@
 
 Voronoi treemap algorithm inspiration and explanation on parent/child node structures
 https://github.com/Kcnarf/d3-voronoi-treemap?tab=readme-ov-file
-https://github.com/d3/d3-hierarchy?tab=readme-ov-file
 
 */
 
@@ -48,7 +47,7 @@ function getInflationColor(inflationRate) {
 }
 
 function getOpacity(unemployment) {
-  if (unemployment === null || unemployment === undefined || isNaN(unemployment)) return 1;
+  if (unemployment === null) return 1;
   
   const BASE = 4;
   const MAX = 15;
@@ -70,7 +69,12 @@ function calcMakeup(record) {
   };
   const sum = Object.values(parts).reduce((s, v) => s + v, 0);
   if (sum <= 0) return {};
-  return Object.fromEntries(Object.entries(parts).map(([k, v]) => [k, (v / sum) * 100]));
+  // Normalize to percentages
+  for (const key in parts) {
+    parts[key] = (parts[key] / sum) * 100;
+  }
+  return parts;
+
 }
 
 function numberConversion(value) {
@@ -96,7 +100,7 @@ function buildHierarchy(rows, year, selectedCountries, selectedContinents) {
 
   const continentNodes = [];
   for (const [cont, items] of byCont.entries()) {
-    // top 9 per continent (no "Others" node, per your ask)
+    // top 9 per continent
     const top = items
       .slice()
       .sort((a, b) => Number(b.GDP) - Number(a.GDP))
