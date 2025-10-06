@@ -83,78 +83,73 @@ function buildHierarchy(rows, year, selectedCountries, selectedContinents) {
     (r) => Number(r.Year) === Number(year) && r["Country Name"] && Number(r.GDP) > 0
   );
 
-  // allow for filtering by country/continent
+  // Respect UI filters
   if (selectedCountries.size > 0) {
     yearRows = yearRows.filter(r => selectedCountries.has(r["Country Name"]));
   }
   if (selectedContinents.size > 0) {
     yearRows = yearRows.filter(r => selectedContinents.has(r["Continent Name"]));
   }
-  
+
   // group by continent
   const byCont = d3.group(yearRows, (d) => d["Continent Name"] || "Unknown");
-  const picked = [];
 
-  // loop through continents and pick top 9 countries using GDP, group all others to Others
+  const continentNodes = [];
   for (const [cont, items] of byCont.entries()) {
-    const sorted = items.slice().sort((a, b) => Number(b.GDP) - Number(a.GDP));
-    const top = sorted.slice(0, TOP_9);
-    const others = sorted.slice(TOP_9);
-    picked.push(...top);
-    if (others.length) {
-      const othersGDP = d3.sum(others, (d) => Number(d.GDP) || 0);
-      const avgUnemp = d3.mean(others, (d) => Number(d.Unemployment) || 0);
-      const avgInfl = d3.mean(others, (d) => Number(d["Inflation Rate"]) || 0);
-      picked.push({
-        Year: year,
-        "Country Name": `Others (${cont})`,
-        "Continent Name": cont,
-        GDP: othersGDP,
-        Unemployment: avgUnemp,
-        "Inflation Rate": avgInfl,
-      });
-    }
+    // top 9 per continent (no "Others" node, per your ask)
+    const top = items
+      .slice()
+      .sort((a, b) => Number(b.GDP) - Number(a.GDP))
+      .slice(0, TOP_9);
+
+    // build country nodes
+    const countries = top.map((r) => {
+      const base = {
+        name: r["Country Name"],
+        continent: cont || "Unknown",
+        unemployment: Number(r.Unemployment).toFixed(0),
+        inflation: Number(r["Inflation Rate"]).toFixed(0),
+        service: Number(r["Service (% GDP)"]).toFixed(0),
+        import: Number(r["Import (% GDP)"]).toFixed(0),
+        export: Number(r["Export (% GDP)"]).toFixed(0),
+        agriculture: Number(r["Agriculture (% GDP)"]).toFixed(0),
+        industry: Number(r["Industry (% GDP)"]).toFixed(0),
+        gpdpercapita: Number(r["GDP Per Capita"]).toFixed(2),
+        education: Number(r["Education Expenditure"]).toFixed(0),
+        health: Number(r["Health Expenditure"]).toFixed(0)
+      };
+
+      // optional GDP makeup children (sum equals GDP)
+      const makeup = calcMakeup(r);
+      const entries = Object.entries(makeup).filter(([, pct]) => pct > 0.0001);
+
+      if (entries.length > 0 && !base.name.startsWith("Others (")) {
+        return {
+          ...base,
+          children: entries.map(([label, pct]) => ({
+            name: label,
+            value: (Number(r.GDP) || 0) * (pct / 100),
+          })),
+        };
+      } else {
+        return {
+          ...base,
+          value: Number(r.GDP) || 0,
+        };
+      }
+    });
+
+    // continent node (no direct value; its size derives from its children)
+    continentNodes.push({
+      name: cont,
+      continent: cont,
+      children: countries
+    });
   }
 
-  const children = picked.map((r) => {
-    const country = {
-      // MINOR MERGE CONFLICT WITH 'toFixed' (check later)
-      name: r["Country Name"],
-      continent: r["Continent Name"] || "Unknown",
-      unemployment: Number(r.Unemployment).toFixed(0),
-      inflation: Number(r["Inflation Rate"]).toFixed(0),
-      service: Number(r["Service (% GDP)"]).toFixed(0),
-      import: Number(r["Import (% GDP)"]).toFixed(0),
-      export: Number(r["Export (% GDP)"]).toFixed(0),
-      agriculture: Number(r["Agriculture (% GDP)"]).toFixed(0),
-      industry: Number(r["Industry (% GDP)"]).toFixed(0),
-      gpdpercapita: Number(r["GDP Per Capita"]).toFixed(2),
-      education:Number(r["Education Expenditure"]).toFixed(0),
-      health: Number(r["Health Expenditure"]).toFixed(0)
-    };
-
-    const makeup = calcMakeup(r);
-    const entries = Object.entries(makeup).filter(([, pct]) => pct > 0.0001);
-    if (entries.length > 0 && !country.name.startsWith("Others (")) {
-      return {
-        ...country,
-        // no direct value; sum of components defines size == GDP
-        children: entries.map(([label, pct]) => ({
-          name: label,
-          value: (Number(r.GDP) || 0) * (pct / 100),
-        })),
-      };
-    } else {
-      // Leaf with no subdivisions
-      return {
-        ...country,
-        value: Number(r.GDP) || 0,
-      };
-    }
-  });
-
-  return { name: "World", children };
+  return { name: "World", children: continentNodes };
 }
+
 
 const VoronoiTreemap = () => {
   const [rows, setRows] = useState([]);
@@ -329,137 +324,138 @@ const VoronoiTreemap = () => {
 
     // group into countries
     const countries = root.children || [];
-    const gCountries = svg.append("g").attr("class", "countries");
 
     countries.forEach((node) => {
-      const country = node.data;
-      const polygon = node.polygon;
-      if (!polygon) return;
+      // section regions/continents first, then countries inside
+      const continents = root.children || [];
+      const gContinents = svg.append("g").attr("class", "continents");
 
-      const borderColor = getInflationColor(country.inflation);
-      const area = Math.abs(d3.polygonArea(polygon));
-      const centroid = d3.polygonCentroid(polygon);
+      continents.forEach((contNode, idx) => {
+        const contPoly = contNode.polygon;
+        if (!contPoly) return;
 
-      const g = gCountries.append("g").attr("class", "country");
-      
-      
-     
-
-      // draw the countries
-      if (displayMode === "name" || !(node.children && node.children.length)) {
-        g.append("path")
-          .attr("d", `M${polygon.join("L")}Z`)
-          .attr("fill", continentColors[country.continent] || "#ccc")
-          .attr("fill-opacity", useOpacity ? getOpacity(country.unemployment) : 1)
-          .attr("stroke", borderColor)
-          .attr("stroke-width", 2)
-
-          //checks if user hovers over a node in tree map if so display tool tip that was referebced in the toolTipRef along with various data
-          .on("mouseover", (event)=>{ toolTipRef.current.html(`<strong>${node.data.name} - ${node.data.continent ?? "Unknown"}</strong><br/>
-              GDP: $${numberConversion(node.value)}<br/>
-              GDP Per Capita: $${node.data.gpdpercapita ?? "N/A"}<br/>
-              Agriculture(% GDP): ${node.data.agriculture ?? "N/A"}%<br/>
-              Service(% GDP): ${node.data.service?? "N/A"}%<br/>
-              Industry(% GDP): ${node.data.industry?? "N/A"}%<br/>
-              Inflation Rate: ${node.data.inflation ?? "N/A"}%<br/>
-              Unemployment Rate: ${node.data.unemployment ?? "N/A"}%<br/>`)
-           
-          .style("opacity",1);   //make the tooltip visible                                       
-          })
-          .on("mousemove", (event)=>{ toolTipRef.current           // moves tooltip with mouse so mouse doesnt obstruct it
-                                      .style("left",event.pageX + 10 +"px")
-                                      .style("top", event.pageY + 10 + "px");                                       
-          })
-          //once user stops hovering over node, make tool tip disappear
-          .on("mouseleave", ()=>{
-            toolTipRef.current.style("opacity", 0);
-          });
-
-      } else {
-        // Draw components first, then a thin outline for the country
-        (node.children || []).forEach((compNode) => {
-          const compPoly = compNode.polygon;
-          if (!compPoly) return;
-          
-          // Create group for component
-          const compGroup = g.append("g");
-          
-          // Add the main fill path
-          compGroup.append("path")
-            .attr("d", `M${compPoly.join("L")}Z`)
-            .attr("fill", gdpComponentColors[compNode.data.name] || "#ddd")
-            .attr("opacity", useOpacity ? getOpacity(country.unemployment) : 1)
-            .attr("stroke", "rgba(0,0,0,0.05)")
-            .attr("stroke-width", 1);
-
-          // Add hover border path (initially invisible)
-          compGroup.append("path")
-            .attr("d", `M${compPoly.join("L")}Z`)
-            .attr("fill", "none")
-            .attr("stroke", "white")
-            .attr("stroke-width", 4)
-            .attr("opacity", 0)
-            .attr("pointer-events", "none");
-
-          // Add hover events to the component group
-          compGroup
-            .on("mouseover", (event) => {
-              const percentage = ((compNode.value / node.value) * 100).toFixed(1);
-              compGroup.select("path:nth-child(2)").attr("opacity", 1);
-              toolTipRef.current.html(`
-          <strong>${node.data.name} - ${compNode.data.name}</strong><br/>
-          Value: $${numberConversion(compNode.value)}<br/>
-          Percentage of Total GDP: ${percentage}%
-              `)
-              .style("opacity", 1);
-            })
-            .on("mousemove", (event) => {
-              toolTipRef.current
-          .style("left", event.pageX + 10 + "px")
-          .style("top", event.pageY + 10 + "px");
-            })
-            .on("mouseleave", () => {
-              compGroup.select("path:nth-child(2)").attr("opacity", 0);
-              toolTipRef.current.style("opacity", 0);
-            });
-        });
-
-        // Country outline on top
-        g.append("path")
-          .attr("d", `M${polygon.join("L")}Z`)
+        // subtle continent outline to show grouping
+        const gCont = gContinents.append("g").attr("class", `continent ${contNode.data.name.replace(/\s+/g,'-').toLowerCase()}`);
+        gCont.append("path")
+          .attr("d", `M${contPoly.join("L")}Z`)
           .attr("fill", "none")
-          .attr("stroke", borderColor)
+          .attr("stroke", "rgba(0,0,0,0.08)")
           .attr("stroke-width", 2);
-      }
 
-      // country labels
-      if (area > 1200) {
-        g.append("text")
-          .attr("x", centroid[0])
-          .attr("y", centroid[1])
-          .attr("text-anchor", "middle")
-          .attr("dominant-baseline", "middle")
-          .attr("fill", displayMode === "name" ? "#fff" : "#111")
-          .style("font-weight", "700")
-          .style("font-size", `${Math.max(10, Math.sqrt(area) / 18)}px`)
-          .text(country.name);
+        // section continents into countries
+        const countries = contNode.children || [];
+        countries.forEach((node) => {
+          const country = node.data;
+          const polygon = node.polygon;
+          if (!polygon) return;
 
-        if (area > 4200) {
-          g.append("text")
-            .attr("x", centroid[0])
-            .attr("y", centroid[1] + Math.sqrt(area) / 18)
-            .attr("text-anchor", "middle")
-            .attr("dominant-baseline", "hanging")
-            .attr("fill", displayMode === "name" ? "#fff" : "#333")
-            .style("font-size", `${Math.max(9, Math.sqrt(area) / 24)}px`)
-            .text(
-              (() => {
-                const nodeValue = node.value || 0;
-                return `$${((nodeValue || 0) / 1e12).toFixed(2)}T`;
-              })()
-            );
-        }
-      }
+          const borderColor = getInflationColor(country.inflation);
+          const area = Math.abs(d3.polygonArea(polygon));
+          const centroid = d3.polygonCentroid(polygon);
+
+          const g = gCont.append("g").attr("class", "country");
+          if (displayMode === "name" || !(node.children && node.children.length)) {
+            g.append("path")
+              .attr("d", `M${polygon.join("L")}Z`)
+              .attr("fill", continentColors[country.continent] || "#ccc")
+              .attr("fill-opacity", useOpacity ? getOpacity(country.unemployment) : 1)
+              .attr("stroke", borderColor)
+              .attr("stroke-width", 2)
+              .on("mouseover", (event)=>{ 
+                toolTipRef.current.html(
+                  `<strong>${node.data.name} - ${node.data.continent ?? "Unknown"}</strong><br/>
+                  GDP: $${numberConversion(node.value)}<br/>
+                  GDP Per Capita: $${node.data.gpdpercapita ?? "N/A"}<br/>
+                  Agriculture(% GDP): ${node.data.agriculture ?? "N/A"}%<br/>
+                  Service(% GDP): ${node.data.service ?? "N/A"}%<br/>
+                  Industry(% GDP): ${node.data.industry ?? "N/A"}%<br/>
+                  Inflation Rate: ${node.data.inflation ?? "N/A"}%<br/>
+                  Unemployment Rate: ${node.data.unemployment ?? "N/A"}%<br/>`
+                ).style("opacity",1);
+              })
+              .on("mousemove", (event)=>{ 
+                toolTipRef.current
+                  .style("left", event.pageX + 10 + "px")
+                  .style("top", event.pageY + 10 + "px");
+              })
+              .on("mouseleave", ()=>{ toolTipRef.current.style("opacity", 0); });
+
+          } else {
+            // GDP components (sub-cells)
+            (node.children || []).forEach((compNode) => {
+              const compPoly = compNode.polygon;
+              if (!compPoly) return;
+
+              const compGroup = g.append("g");
+              compGroup.append("path")
+                .attr("d", `M${compPoly.join("L")}Z`)
+                .attr("fill", gdpComponentColors[compNode.data.name] || "#ddd")
+                .attr("opacity", useOpacity ? getOpacity(country.unemployment) : 1)
+                .attr("stroke", "rgba(0,0,0,0.05)")
+                .attr("stroke-width", 1);
+
+              compGroup.append("path")
+                .attr("d", `M${compPoly.join("L")}Z`)
+                .attr("fill", "none")
+                .attr("stroke", "white")
+                .attr("stroke-width", 4)
+                .attr("opacity", 0)
+                .attr("pointer-events", "none");
+
+              compGroup
+                .on("mouseover", () => {
+                  const percentage = ((compNode.value / node.value) * 100).toFixed(1);
+                  compGroup.select("path:nth-child(2)").attr("opacity", 1);
+                  toolTipRef.current.html(`
+                    <strong>${node.data.name} - ${compNode.data.name}</strong><br/>
+                    Value: $${numberConversion(compNode.value)}<br/>
+                    Percentage of Total GDP: ${percentage}%
+                  `).style("opacity", 1);
+                })
+                .on("mousemove", (event) => {
+                  toolTipRef.current
+                    .style("left", event.pageX + 10 + "px")
+                    .style("top", event.pageY + 10 + "px");
+                })
+                .on("mouseleave", () => {
+                  compGroup.select("path:nth-child(2)").attr("opacity", 0);
+                  toolTipRef.current.style("opacity", 0);
+                });
+            });
+
+            // Country outline
+            g.append("path")
+              .attr("d", `M${polygon.join("L")}Z`)
+              .attr("fill", "none")
+              .attr("stroke", borderColor)
+              .attr("stroke-width", 2);
+          }
+
+          // labels
+          if (area > 1200) {
+            g.append("text")
+              .attr("x", centroid[0])
+              .attr("y", centroid[1])
+              .attr("text-anchor", "middle")
+              .attr("dominant-baseline", "middle")
+              .attr("fill", displayMode === "name" ? "#fff" : "#111")
+              .style("font-weight", "700")
+              .style("font-size", `${Math.max(10, Math.sqrt(area) / 18)}px`)
+              .text(country.name);
+
+            if (area > 4200) {
+              g.append("text")
+                .attr("x", centroid[0])
+                .attr("y", centroid[1] + Math.sqrt(area) / 18)
+                .attr("text-anchor", "middle")
+                .attr("dominant-baseline", "hanging")
+                .attr("fill", displayMode === "name" ? "#fff" : "#333")
+                .style("font-size", `${Math.max(9, Math.sqrt(area) / 24)}px`)
+                .text(`$${((node.value || 0) / 1e12).toFixed(2)}T`);
+            }
+          }
+        });
+      });
     });
   }, [hierarchyData, dims, displayMode, selectedYear, useOpacity]);
 
