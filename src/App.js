@@ -381,13 +381,48 @@ const VoronoiTreemap = () => {
         (node.children || []).forEach((compNode) => {
           const compPoly = compNode.polygon;
           if (!compPoly) return;
-          g.append("path")
+          
+          // Create group for component
+          const compGroup = g.append("g");
+          
+          // Add the main fill path
+          compGroup.append("path")
             .attr("d", `M${compPoly.join("L")}Z`)
             .attr("fill", gdpComponentColors[compNode.data.name] || "#ddd")
             .attr("opacity", useOpacity ? getOpacity(country.unemployment) : 1)
             .attr("stroke", "rgba(0,0,0,0.05)")
             .attr("stroke-width", 1);
-            
+
+          // Add hover border path (initially invisible)
+          compGroup.append("path")
+            .attr("d", `M${compPoly.join("L")}Z`)
+            .attr("fill", "none")
+            .attr("stroke", "white")
+            .attr("stroke-width", 4)
+            .attr("opacity", 0)
+            .attr("pointer-events", "none");
+
+          // Add hover events to the component group
+          compGroup
+            .on("mouseover", (event) => {
+              const percentage = ((compNode.value / node.value) * 100).toFixed(1);
+              compGroup.select("path:nth-child(2)").attr("opacity", 1);
+              toolTipRef.current.html(`
+          <strong>${node.data.name} - ${compNode.data.name}</strong><br/>
+          Value: $${numberConversion(compNode.value)}<br/>
+          Percentage of Total GDP: ${percentage}%
+              `)
+              .style("opacity", 1);
+            })
+            .on("mousemove", (event) => {
+              toolTipRef.current
+          .style("left", event.pageX + 10 + "px")
+          .style("top", event.pageY + 10 + "px");
+            })
+            .on("mouseleave", () => {
+              compGroup.select("path:nth-child(2)").attr("opacity", 0);
+              toolTipRef.current.style("opacity", 0);
+            });
         });
 
         // Country outline on top
