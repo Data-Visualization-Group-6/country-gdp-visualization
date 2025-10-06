@@ -1,18 +1,22 @@
 import React, { useState, useEffect, useMemo, useRef } from "react";
-import { Upload } from "lucide-react";
 import * as d3 from "d3";
 import { voronoiTreemap } from "d3-voronoi-treemap";
 import Papa from "papaparse";
 
-const TOP_N_PER_CONTINENT = 9;
+const TOP_9 = 9;
+
+// Load csv which lives on site's root
+const CSV_PATH =
+  new URLSearchParams(window.location.search).get('src') ||
+  `${process.env.PUBLIC_URL}/countries.csv`;
 
 const continentColors = {
-  Africa: "#FF6B6B",
-  Asia: "#008000",
-  Europe: "#45B7D1",
-  "North America": "#FFA07A",
-  "South America": "#98D8C8",
-  Oceania: "#F7DC6F",
+  Africa: "#041035",
+  Asia: "#0015ff",
+  Europe: "#ff7d00",
+  "North America": "#073b4c",
+  "South America": "#687259",
+  Oceania: "#ff006d",
 };
 
 const gdpComponentColors = {
@@ -36,9 +40,16 @@ function getInflationColor(inflationRate) {
 }
 
 function getOpacity(unemployment) {
-  if (unemployment === null || unemployment === undefined || isNaN(unemployment)) return 0.5;
-  const employment = 100 - unemployment;
-  return Math.max(0.3, Math.min(1, employment / 100));
+  if (unemployment === null || unemployment === undefined || isNaN(unemployment)) return 0.1;
+  
+  const BASE = 4;
+  const MAX = 15;
+  const BASE_OPACITY = 0.9;
+  const MAX_OPACITY = 0.1;
+
+  const unemployment_ = Number(unemployment);
+  const opacity = Math.max(BASE, Math.min (MAX, unemployment_));
+  return BASE_OPACITY + ((opacity - BASE) / (MAX - BASE)) * (MAX_OPACITY - BASE_OPACITY);
 }
 
 function calcMakeup(record) {
@@ -50,9 +61,6 @@ function calcMakeup(record) {
     "Import (% GDP)": Number(record["Import (% GDP)"]) || 0,
   };
   const sum = Object.values(parts).reduce((s, v) => s + v, 0);
-  // const total = Object.values(parts).reduce((s, v) => s + v, 0); // reminder to merge this return
-  // const other = Math.max(0, 100 - total);                       // this too
-  //   return { ...comp, Other: other };                        //   ref
   if (sum <= 0) return {};
   return Object.fromEntries(Object.entries(parts).map(([k, v]) => [k, (v / sum) * 100]));
 }
@@ -72,7 +80,7 @@ function buildHierarchy(rows, year, selectedCountries, selectedContinents) {
     (r) => Number(r.Year) === Number(year) && r["Country Name"] && Number(r.GDP) > 0
   );
 
-  // Filter by selected countries and continents
+  // allow for filtering by country/continent
   if (selectedCountries.size > 0) {
     yearRows = yearRows.filter(r => selectedCountries.has(r["Country Name"]));
   }
@@ -80,20 +88,20 @@ function buildHierarchy(rows, year, selectedCountries, selectedContinents) {
     yearRows = yearRows.filter(r => selectedContinents.has(r["Continent Name"]));
   }
   
-
-  // limit to TOP_N per continent + Others (adjust TOP_N_PER_CONTINENT to taste)
+  // group by continent
   const byCont = d3.group(yearRows, (d) => d["Continent Name"] || "Unknown");
   const picked = [];
 
+  // loop through continents and pick top 9 countries using GDP, group all others to Others
   for (const [cont, items] of byCont.entries()) {
     const sorted = items.slice().sort((a, b) => Number(b.GDP) - Number(a.GDP));
-    const top = sorted.slice(0, TOP_N_PER_CONTINENT);
-    const rest = sorted.slice(TOP_N_PER_CONTINENT);
+    const top = sorted.slice(0, TOP_9);
+    const others = sorted.slice(TOP_9);
     picked.push(...top);
-    if (rest.length) {
-      const othersGDP = d3.sum(rest, (d) => Number(d.GDP) || 0);
-      const avgUnemp = d3.mean(rest, (d) => Number(d.Unemployment) || 0);
-      const avgInfl = d3.mean(rest, (d) => Number(d["Inflation Rate"]) || 0);
+    if (others.length) {
+      const othersGDP = d3.sum(others, (d) => Number(d.GDP) || 0);
+      const avgUnemp = d3.mean(others, (d) => Number(d.Unemployment) || 0);
+      const avgInfl = d3.mean(others, (d) => Number(d["Inflation Rate"]) || 0);
       picked.push({
         Year: year,
         "Country Name": `Others (${cont})`,
@@ -101,7 +109,6 @@ function buildHierarchy(rows, year, selectedCountries, selectedContinents) {
         GDP: othersGDP,
         Unemployment: avgUnemp,
         "Inflation Rate": avgInfl,
-        // no makeup for aggregate; render as a solid cell
       });
     }
   }
@@ -121,7 +128,6 @@ function buildHierarchy(rows, year, selectedCountries, selectedContinents) {
       gpdpercapita: Number(r["GDP Per Capita"]).toFixed(2),
       education:Number(r["Education Expenditure"]).toFixed(0),
       health: Number(r["Health Expenditure"]).toFixed(0)
-      // If we have makeup fields, add children; else make leaf with value = GDP
     };
 
     const makeup = calcMakeup(r);
@@ -162,10 +168,6 @@ const VoronoiTreemap = () => {
   const [dims, setDims] = useState({ w: 1000, h: 700 });
   const toolTipRef = useRef(null); // ref for toolTip object
 
-  console.log("continentColors entries:", Object.entries(continentColors));
-  console.log("gdpComponentColors entries:", Object.entries(gdpComponentColors));
-  console.log("displayMode:", displayMode);
-
   // Resize observer for responsive SVG
   useEffect(() => {
     const ro = new ResizeObserver((entries) => {
@@ -191,24 +193,24 @@ const VoronoiTreemap = () => {
   }, []);
 
   useEffect(() => {
-  async function loadCSV() {
+  function loadCSV() {
     setProcessing(true);
-    Papa.parse("countries.csv", {
+    Papa.parse(CSV_PATH, {
       download: true,
       header: true,
       dynamicTyping: true,
       skipEmptyLines: true,
       complete: ({ data }) => {
-        const coerced = data.map((r) => ({
+        const parsedData = data.map((r) => ({
           ...r,
           Year: Number(r.Year),
           GDP: Number(r.GDP),
           Unemployment: r.Unemployment !== "" ? Number(r.Unemployment) : null,
           "Inflation Rate": r["Inflation Rate"] !== "" ? Number(r["Inflation Rate"]) : null,
         }));
-        setRows(coerced);
+        setRows(parsedData);
 
-        const years = coerced.map((r) => r.Year).filter((y) => !isNaN(y));
+        const years = parsedData.map((r) => r.Year).filter((y) => !isNaN(y));
         if (years.length) {
           const min = Math.min(...years);
           const max = Math.max(...years);
@@ -225,45 +227,6 @@ const VoronoiTreemap = () => {
   }
   loadCSV();
   }, []); // runs once on mount
-
-  // Parse CSV via Papa
-  const onFile = async (e) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    setProcessing(true);
-    Papa.parse(file, {
-      header: true,
-      dynamicTyping: true,
-      skipEmptyLines: true,
-      complete: ({ data }) => {
-        const coerced = data.map((r) => ({
-          ...r,
-          Year: Number(r.Year),
-          GDP: Number(r.GDP),
-          Unemployment: r.Unemployment !== "" ? Number(r.Unemployment) : null,
-          "Inflation Rate": r["Inflation Rate"] !== "" ? Number(r["Inflation Rate"]) : null,
-        }));
-        setRows(coerced);
-        const years = coerced.map((r) => r.Year).filter((y) => !isNaN(y));
-        if (years.length) {
-          const min = Math.min(...years);
-          const max = Math.max(...years);
-          setYearBounds([min, max]);
-          setSelectedYear(min);
-        }
-        // Reset selections when new data is loaded
-        setSelectedCountries(new Set());
-        setSelectedContinents(new Set());
-        setExpandedContinents(new Set());
-        setProcessing(false);
-      },
-      error: (err) => {
-        console.error(err);
-        setProcessing(false);
-        alert("Failed to parse CSV. Check headers and numeric fields.");
-      },
-    });
-  };
 
   // Get hierarchical structure of continents and their countries
   const continentCountryMap = useMemo(() => {
@@ -332,6 +295,7 @@ const VoronoiTreemap = () => {
     const { w, h } = dims;
     const svg = svgEl.attr("viewBox", `0 0 ${w} ${h}`);
 
+
     function seededRandom(seed) {
       let s = seed;
       return function() {
@@ -371,7 +335,6 @@ const VoronoiTreemap = () => {
       if (!polygon) return;
 
       const borderColor = getInflationColor(country.inflation);
-      const opacity = getOpacity(country.unemployment);
       const area = Math.abs(d3.polygonArea(polygon));
       const centroid = d3.polygonCentroid(polygon);
 
@@ -385,13 +348,13 @@ const VoronoiTreemap = () => {
         g.append("path")
           .attr("d", `M${polygon.join("L")}Z`)
           .attr("fill", continentColors[country.continent] || "#ccc")
-          .attr("opacity", opacity)
+          .attr("fill-opacity", getOpacity(country.unemployment))
           .attr("stroke", borderColor)
           .attr("stroke-width", 2)
 
           //checks if user hovers over a node in tree map if so display tool tip that was referebced in the toolTipRef along with various data
           .on("mouseover", (event)=>{ toolTipRef.current.html(`<strong>${node.data.name}</strong><br/>
-                                                    GDP: $${numberConversion(node.value).toLocaleString()}<br/>
+                                                    GDP: $${numberConversion(node.value)}<br/>
                                                     GDP Per Capita: $${node.data.gpdpercapita ?? "N/A"}<br/>
                                                     Agriculture(% GDP): ${node.data.agriculture ?? "N/A"}%<br/>
                                                     Service(% GDP): ${node.data.service?? "N/A"}%<br/>
@@ -419,7 +382,7 @@ const VoronoiTreemap = () => {
           g.append("path")
             .attr("d", `M${compPoly.join("L")}Z`)
             .attr("fill", gdpComponentColors[compNode.data.name] || "#ddd")
-            .attr("opacity", opacity)
+            .attr("opacity", getOpacity(country.unemployment))
             .attr("stroke", "rgba(0,0,0,0.05)")
             .attr("stroke-width", 1);
             
@@ -475,20 +438,6 @@ const VoronoiTreemap = () => {
         {/* Controls */}
         <div className="bg-gray-100 rounded-lg p-4 mb-6">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
-            {/* File Upload */}
-            <div>
-              <label className="block text-sm font-medium mb-2">Upload CSV File</label>
-              <div className="relative">
-                <input type="file" accept=".csv" onChange={onFile} className="hidden" id="file-upload" />
-                <label
-                  htmlFor="file-upload"
-                  className="flex items-center justify-center gap-2 bg-blue-500 text-white px-4 py-2 rounded cursor-pointer hover:bg-blue-600"
-                >
-                  <Upload size={20} />
-                  {rows.length > 0 ? "Change File" : "Upload CSV"}
-                </label>
-              </div>
-            </div>
 
             {/* Year Slider */}
             <div>
@@ -698,6 +647,7 @@ const VoronoiTreemap = () => {
           </div>
         )}
 
+
         {/* Legend */}
         <div className="bg-gray-100 rounded-lg p-4 mb-6">
           <h3 className="font-bold mb-3">Legend</h3>
@@ -724,15 +674,9 @@ const VoronoiTreemap = () => {
           </div>
         </div>
 
-        {/* Chart */}
-        <div ref={wrapperRef} className="w-full bg-white rounded-lg shadow-sm ring-1 ring-gray-200">
+        {/* Load the treemap chart */}
+        <div ref={wrapperRef} className="w-full bg-white">
           <svg ref={svgRef} className="w-full h-auto block" />
-          {!rows.length && (
-            <div className="text-center py-20">
-              <Upload size={48} className="mx-auto mb-4 text-gray-400" />
-              <div className="text-xl text-gray-600">Upload a CSV file to begin</div>
-            </div>
-          )}
         </div>
 
         {processing && (
