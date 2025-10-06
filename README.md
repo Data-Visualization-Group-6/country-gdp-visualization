@@ -12,7 +12,7 @@ You may hover over each node for additional info.
 
 To access the visualization, either go [here](https://data-visualization-group-6.github.io/country-gdp-visualization/) or clone this repository and run it locally. (details shown in the next section.)
 
-Here is a short guide on how to navigate hte visualization:
+Here is a short guide on how to navigate the visualization:
 - The slider on the top left determines which year you are looking at. From left to right, you can choose which year to look at (from 2000 to 2022).
 - The display mode lets you switch between two views, either by country name or by GDP makeup.
   - The 'name' (default) view simply lets you see the data sorted by individual countries.
