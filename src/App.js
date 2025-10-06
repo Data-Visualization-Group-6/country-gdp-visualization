@@ -650,6 +650,42 @@ const VoronoiTreemap = () => {
           )}
         </div>
 
+        {/* Load the treemap chart */}
+        <div ref={wrapperRef} className="w-full bg-white">
+          <svg ref={svgRef} className="w-full h-auto block" />
+        </div>
+
+        {processing && (
+          <div className="text-center py-6 text-gray-600">Processing data…</div>
+        )}
+
+        {/* Legend */}
+        <div className="bg-gray-100 rounded-lg p-4 mb-6">
+          <h3 className="font-bold mb-3">Legend</h3>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+            <div><strong>Size:</strong> GDP (area)</div>
+            <div><strong>Opacity:</strong> {useOpacity ? "Employment rate" : "Solid Color"}</div>
+            <div><strong>Border:</strong> Inflation (Green=+, Red=-, White=NULL)</div>
+            <div><strong>Color:</strong> {displayMode === "name" ? "Continent" : "GDP Components"}</div>
+          </div>
+          <div className="flex flex-wrap gap-3 mt-3 text-sm">
+            {displayMode === "name"
+              ? Object.entries(continentColors).map(([k, v]) => (
+                  <div key={k} className="flex items-center gap-2">
+                    <span className="inline-block w-4 h-4 rounded" style={{ background: v }} />
+                    {k}
+                  </div>
+                ))
+              : Object.entries(gdpComponentColors).map(([k, v]) => (
+                  <div key={k} className="flex items-center gap-2">
+                    <span className="inline-block w-4 h-4 rounded" style={{ background: v }} />
+                    {k}
+                  </div>
+                ))}
+          </div>
+        </div>
+
+
         {/* Top 5 Countries Section */}
         {rows.length > 0 && top5Countries.length > 0 && (
           <div className="bg-gray-100 rounded-lg p-4 mb-6">
@@ -699,45 +735,12 @@ const VoronoiTreemap = () => {
             )}
           </div>
         )}
-
-
-        {/* Legend */}
-        <div className="bg-gray-100 rounded-lg p-4 mb-6">
-          <h3 className="font-bold mb-3">Legend</h3>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-            <div><strong>Size:</strong> GDP (area)</div>
-            <div><strong>Opacity:</strong> {useOpacity ? "Employment rate" : "Solid Color"}</div>
-            <div><strong>Border:</strong> Inflation (Green=+, Red=-, White=NULL)</div>
-            <div><strong>Color:</strong> {displayMode === "name" ? "Continent" : "GDP Components"}</div>
-          </div>
-          <div className="flex flex-wrap gap-3 mt-3 text-sm">
-            {displayMode === "name"
-              ? Object.entries(continentColors).map(([k, v]) => (
-                  <div key={k} className="flex items-center gap-2">
-                    <span className="inline-block w-4 h-4 rounded" style={{ background: v }} />
-                    {k}
-                  </div>
-                ))
-              : Object.entries(gdpComponentColors).map(([k, v]) => (
-                  <div key={k} className="flex items-center gap-2">
-                    <span className="inline-block w-4 h-4 rounded" style={{ background: v }} />
-                    {k}
-                  </div>
-                ))}
-          </div>
-        </div>
-
-        {/* Load the treemap chart */}
-        <div ref={wrapperRef} className="w-full bg-white">
-          <svg ref={svgRef} className="w-full h-auto block" />
-        </div>
-
-        {processing && (
-          <div className="text-center py-6 text-gray-600">Processing data…</div>
-        )}
       </div>
       </div>
     </div>
+
+      
+
   );
 };
 
