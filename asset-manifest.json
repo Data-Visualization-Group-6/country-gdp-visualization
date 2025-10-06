@@ -1,15 +1,15 @@
 {
   "files": {
     "main.css": "/country-gdp-visualization/static/css/main.e6c13ad2.css",
-    "main.js": "/country-gdp-visualization/static/js/main.18c32d08.js",
+    "main.js": "/country-gdp-visualization/static/js/main.9a6c5604.js",
     "static/js/453.c8864add.chunk.js": "/country-gdp-visualization/static/js/453.c8864add.chunk.js",
     "index.html": "/country-gdp-visualization/index.html",
     "main.e6c13ad2.css.map": "/country-gdp-visualization/static/css/main.e6c13ad2.css.map",
-    "main.18c32d08.js.map": "/country-gdp-visualization/static/js/main.18c32d08.js.map",
+    "main.9a6c5604.js.map": "/country-gdp-visualization/static/js/main.9a6c5604.js.map",
     "453.c8864add.chunk.js.map": "/country-gdp-visualization/static/js/453.c8864add.chunk.js.map"
   },
   "entrypoints": [
     "static/css/main.e6c13ad2.css",
-    "static/js/main.18c32d08.js"
+    "static/js/main.9a6c5604.js"
   ]
 }
