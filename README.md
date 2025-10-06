@@ -1,70 +1,27 @@
-# Getting Started with Create React App
+# Voronoi Treemap Visualization for Country GDP
 
-This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
+The visualization is hosted via GitHub Pages: https://data-visualization-group-6.github.io/country-gdp-visualization/
 
-## Available Scripts
+## Description
 
-In the project directory, you can run:
+This visualization showcases the data from countries across the globe, such as GDP, inflation rate, unemployment rate, and etc., within each node in the treemap. The area of each node is determined by the country's GDP value (larger nodes signify higher GDP values).
 
-### `npm start`
+You may hover over each node for additional info.
 
-Runs the app in the development mode.\
-Open [http://localhost:3000](http://localhost:3000) to view it in your browser.
+### Quick Guide
 
-The page will reload when you make changes.\
-You may also see any lint errors in the console.
+To access the visualization, either go [here](https://data-visualization-group-6.github.io/country-gdp-visualization/) or clone this repository and run it locally. (details shown in the next section.)
 
-### `npm test`
+Here is a short guide on how to navigate hte visualization:
+- The slider on the top left determines which year you are looking at. From left to right, you can choose which year to look at (from 2000 to 2022).
+- The display mode lets you switch between two views, either by country name or by GDP makeup.
+  - The 'name' (default) view simply lets you see the data sorted by individual countries.
+  - The 'GDP makeup' view lets you see the subregions divided by the GDP% of different sectors within a country.
+- The 'employment opacity' toggle allows you to view unemployment rate as the change in opacity of each country's node. More transparent (or lighter) colors signify a higher unemployment rate.
+- There is a box that lets you filter through specific continents and countries that you wish to see.
 
-Launches the test runner in the interactive watch mode.\
-See the section about [running tests](https://facebook.github.io/create-react-app/docs/running-tests) for more information.
-
-### `npm run build`
-
-Builds the app for production to the `build` folder.\
-It correctly bundles React in production mode and optimizes the build for the best performance.
-
-The build is minified and the filenames include the hashes.\
-Your app is ready to be deployed!
-
-See the section about [deployment](https://facebook.github.io/create-react-app/docs/deployment) for more information.
-
-### `npm run eject`
-
-**Note: this is a one-way operation. Once you `eject`, you can't go back!**
-
-If you aren't satisfied with the build tool and configuration choices, you can `eject` at any time. This command will remove the single build dependency from your project.
-
-Instead, it will copy all the configuration files and the transitive dependencies (webpack, Babel, ESLint, etc) right into your project so you have full control over them. All of the commands except `eject` will still work, but they will point to the copied scripts so you can tweak them. At this point you're on your own.
-
-You don't have to ever use `eject`. The curated feature set is suitable for small and middle deployments, and you shouldn't feel obligated to use this feature. However we understand that this tool wouldn't be useful if you couldn't customize it when you are ready for it.
-
-## Learn More
-
-You can learn more in the [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started).
-
-To learn React, check out the [React documentation](https://reactjs.org/).
-
-### Code Splitting
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/code-splitting](https://facebook.github.io/create-react-app/docs/code-splitting)
-
-### Analyzing the Bundle Size
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size](https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size)
-
-### Making a Progressive Web App
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app](https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app)
-
-### Advanced Configuration
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/advanced-configuration](https://facebook.github.io/create-react-app/docs/advanced-configuration)
-
-### Deployment
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/deployment](https://facebook.github.io/create-react-app/docs/deployment)
-
-### `npm run build` fails to minify
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify](https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify)
+## Rough Installation Guide
+To run the visualization locally, first ensure you have Node.js installed.
+1. Clone the repository and `cd` into it.
+2. Run `npm install` to obtain all related packages.
+3. `npm run start` to start the visualization
