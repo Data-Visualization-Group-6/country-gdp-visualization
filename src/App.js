@@ -35,27 +35,27 @@ const gdpComponentColors = {
   Other: "#E0E0E0",
 };
 
+// inflation borders
 function getInflationColor(inflationRate) {
-  if (inflationRate === null || inflationRate === undefined || isNaN(inflationRate)) return "#FFFFFF";
+  if (inflationRate === null || isNaN(inflationRate)) return "#FFFFFF";
   if (inflationRate < 0) {
     const intensity = Math.min(Math.abs(inflationRate) * 20, 255);
-    return `rgb(255, ${255 - intensity}, ${255 - intensity})`; // red-ish for deflation magnitude
+    return `rgb(255, ${255 - intensity}, ${255 - intensity})`; // red = deflation
   } else {
     const intensity = Math.min(inflationRate * 20, 255);
-    return `rgb(${255 - intensity}, 255, ${255 - intensity})`; // green-ish for inflation magnitude
+    return `rgb(${255 - intensity}, 255, ${255 - intensity})`; // green = inflation
   }
 }
 
 function getOpacity(unemployment) {
   if (unemployment === null) return 1;
-  
-  const BASE = 4;
+  const BASE = 4; // since unemployment rate is generally 3-4
   const MAX = 15;
   const BASE_OPACITY = 1;
-  const MAX_OPACITY = 0.3;
-
+  const MAX_OPACITY = 0.5; // half transparency
   const unemployment_ = Number(unemployment);
   const opacity = Math.max(BASE, Math.min (MAX, unemployment_));
+  // clamped between 0 and 1 opacity depending on unemployment
   return BASE_OPACITY + ((opacity - BASE) / (MAX - BASE)) * (MAX_OPACITY - BASE_OPACITY);
 }
 
@@ -111,7 +111,7 @@ function buildHierarchy(rows, year, selectedCountries, selectedContinents) {
       const base = {
         name: r["Country Name"],
         continent: cont || "Unknown",
-        unemployment: Number(r.Unemployment) ?? null,
+        unemployment: Number(r.Unemployment),
         inflation: Number(r["Inflation Rate"]).toFixed(0),
         service: Number(r["Service (% GDP)"]).toFixed(0),
         import: Number(r["Import (% GDP)"]).toFixed(0),
@@ -242,7 +242,7 @@ const VoronoiTreemap = () => {
         map[continent].add(country);
       }
     });
-    // Convert Sets to sorted arrays
+    // make into arrays and sort
     const sortedMap = {};
     Object.keys(map).sort().forEach(continent => {
       sortedMap[continent] = [...map[continent]].sort();
@@ -254,7 +254,7 @@ const VoronoiTreemap = () => {
     return Object.keys(continentCountryMap).sort();
   }, [continentCountryMap]);
 
-  // Get top 5 countries based on current selections
+  // top 5 countries within selected
   const top5Countries = useMemo(() => {
     if (!rows.length) return [];
     
@@ -262,7 +262,7 @@ const VoronoiTreemap = () => {
       (r) => Number(r.Year) === Number(selectedYear) && r["Country Name"] && Number(r.GDP) > 0
     );
 
-    // Apply same filtering logic as buildHierarchy
+    // filtering
     if (selectedCountries.size > 0) {
       filteredRows = filteredRows.filter(r => selectedCountries.has(r["Country Name"]));
     }
@@ -270,7 +270,6 @@ const VoronoiTreemap = () => {
       filteredRows = filteredRows.filter(r => selectedContinents.has(r["Continent Name"]));
     }
 
-    // Sort by GDP and take top 5
     return filteredRows
       .sort((a, b) => Number(b.GDP) - Number(a.GDP))
       .slice(0, 5)
@@ -326,23 +325,22 @@ const VoronoiTreemap = () => {
 
     vt(root);
     
+    // section into continents to group countries
     const continents = root.children || [];
     const gContinents = svg.append("g").attr("class", "continents");
     
+    // 
     continents.forEach((contNode) => {
       const contPoly = contNode.polygon;
       if (!contPoly) return;
 
       const gCont = gContinents
         .append("g")
-        .attr(
-          "class",
-          `continent ${contNode.data.name.replace(/\s+/g, "-").toLowerCase()}`
-        );
-
+        .attr("class", "continent " + contNode.data.name)
+      //join into string for SVG path
       gCont
         .append("path")
-        .attr("d", `M${contPoly.join("L")}Z`)
+        .attr("d", "M" + contPoly.map(d => d.join(",")).join("L") + "Z")
         .attr("fill", "none")
         .attr("stroke", "rgba(0,0,0,0.08)")
         .attr("stroke-width", 2);
